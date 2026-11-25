@@ -59,11 +59,6 @@ def one(messages, needle):
     return matches[0]
 
 
-@pytest.fixture(autouse=True)
-def _hostname(monkeypatch):
-    monkeypatch.setenv("HOSTNAME", "local-pecron-monitor-ha-app")
-
-
 # --- validation errors -----------------------------------------------------
 
 

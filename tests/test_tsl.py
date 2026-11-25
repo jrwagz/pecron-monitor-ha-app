@@ -19,11 +19,6 @@ F3000_TSL = WIZARD_DATA["devices"][0]["tsl_cache"]
 AUTH_KEY = "c2VjcmV0LWF1dGgta2V5IQ=="
 
 
-@pytest.fixture(autouse=True)
-def _hostname(monkeypatch):
-    monkeypatch.setenv("HOSTNAME", "local-pecron-monitor-ha-app")
-
-
 def write(tmp_path, data, raw=False):
     path = tmp_path / "pecron-setup.yaml"
     path.write_text(data if raw else yaml.safe_dump(data))

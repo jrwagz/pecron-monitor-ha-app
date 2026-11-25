@@ -78,7 +78,6 @@ class Env:
         return json.loads(Path(str(self.plan_path) + ".args").read_text())
 
     def runner(self, **kw):
-        kw.setdefault("delays", (5, 10, 20, 40, 80, 160, 300))
         return Runner(
             options_path=str(self.options_path),
             setup_path=str(self.setup_path),
@@ -100,8 +99,7 @@ class Env:
 
 
 @pytest.fixture
-def env(tmp_path, monkeypatch):
-    monkeypatch.setenv("HOSTNAME", "local-pecron-monitor-ha-app")
+def env(tmp_path):
     return Env(tmp_path)
 
 
