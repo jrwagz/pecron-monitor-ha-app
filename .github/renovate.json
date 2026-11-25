@@ -1,0 +1,54 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "ignorePresets": [":ignoreModulesAndTests"],
+  "enabledManagers": ["custom.regex", "dockerfile", "github-actions", "pip_requirements"],
+  "schedule": ["before 8am on monday"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "pecron-monitor: the version tag and its commit change together",
+      "managerFilePatterns": ["/^pecron_monitor_ha_app/Dockerfile$/"],
+      "matchStrings": [
+        "ARG PECRON_MONITOR_VERSION=(?<currentValue>v\\S+)\\s+ARG PECRON_MONITOR_SHA=(?<currentDigest>[a-f0-9]{40})"
+      ],
+      "depNameTemplate": "attractify-logan/pecron-monitor",
+      "datasourceTemplate": "github-tags"
+    },
+    {
+      "customType": "regex",
+      "description": "Mosquitto image used by the smoke test",
+      "managerFilePatterns": ["/^tests/smoke/run\\.sh$/"],
+      "matchStrings": ["mosquitto=(?<depName>eclipse-mosquitto):(?<currentValue>[\\w.-]+)"],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Tool images run by name:tag@digest in workflows",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": [
+        "(?<depName>(?:ghcr\\.io/)?[a-z0-9-]+/[a-z0-9-]+):(?<currentValue>[\\w.-]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Base image tags look like <python>-alpine<alpine>-<YYYY.MM.P>. The constant major 3 of Python and Alpine is literal, leaving Python minor, Alpine minor and the release date to compare in that order",
+      "matchPackageNames": ["ghcr.io/home-assistant/base-python"],
+      "versioning": "regex:^3\\.(?<major>\\d+)-alpine3\\.(?<minor>\\d+)-(?<patch>\\d{4})\\.(?<build>\\d{2})\\.(?<revision>\\d+)$"
+    },
+    {
+      "description": "pecron-monitor is developed against pycryptodome 3.x",
+      "matchPackageNames": ["pycryptodome"],
+      "allowedVersions": "<4"
+    },
+    {
+      "description": "Changes to the app need a release, which Renovate cannot do",
+      "matchFileNames": ["pecron_monitor_ha_app/**"],
+      "prBodyNotes": [
+        "This changes the app. Before releasing: add a changelog entry, read the upstream changelog, release (see RELEASING.md), and consider `breaking_versions`."
+      ]
+    }
+  ]
+}

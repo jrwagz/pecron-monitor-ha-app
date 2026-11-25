@@ -56,8 +56,13 @@ jobs:
       - name: actionlint
         run: >-
           docker run --rm -v "$PWD:/repo" --workdir /repo
-          rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+          rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
           -color
+      - name: Renovate config validator
+        run: >-
+          docker run --rm -v "$PWD:/repo" --workdir /repo
+          ghcr.io/renovatebot/renovate:44.222.5@sha256:8a4c49ef19bb71bedf4eaa4d1087a31a1793bd53de41478753d2d648e53eed19
+          renovate-config-validator --strict
       - name: ruff
         run: |
           ruff check .
