@@ -1,0 +1,5 @@
+# Runtime dependencies of pecron-monitor (installed with --no-deps).
+# pycryptodome stays on 3.x, the major version upstream is developed against.
+paho-mqtt==2.2.0
+pycryptodome==3.24.1
+pyyaml==6.0.3
