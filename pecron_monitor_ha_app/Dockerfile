@@ -23,4 +23,8 @@ RUN pip install --no-cache-dir --no-deps \
 COPY app /opt/pecron_app
 ENV PYTHONPATH=/opt/pecron_app
 
+# Give the runner time to stop pecron-monitor (10 s grace) before s6 kills it.
+ENV S6_SERVICES_GRACETIME=12000
+COPY rootfs /
+
 COPY THIRD_PARTY_NOTICES.md /usr/share/doc/pecron-monitor-ha-app/THIRD_PARTY_NOTICES.md
