@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import contextlib
 import ipaddress
 import json
 import os
@@ -409,8 +410,6 @@ def write_config(config: dict, path: str) -> None:
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
     except BaseException:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp)
-        except FileNotFoundError:
-            pass
         raise

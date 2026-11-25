@@ -64,7 +64,7 @@ def load_tsl(path: str) -> dict[str, dict]:
         if key in seen:
             raise _fail(f"device key {shown} is listed more than once.")
         seen.add(key)
-        if "tsl_cache" not in device or device["tsl_cache"] is None:
+        if device.get("tsl_cache") is None:
             continue  # the wizard writes no tsl_cache when the TSL fetch failed
         if not _valid_tsl(device["tsl_cache"]):
             raise _fail(

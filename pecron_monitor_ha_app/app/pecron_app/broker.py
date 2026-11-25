@@ -41,31 +41,25 @@ class MqttUnavailable(Exception):
     """The Supervisor MQTT service could not be used right now (retryable)."""
 
 
+def _unavailable(problem: str) -> MqttUnavailable:
+    return MqttUnavailable(f"The Home Assistant MQTT service {problem}. {_INSTALL_HINT}")
+
+
 def _fetch_service(token: str) -> dict:
     request = Request(SERVICE_URL, headers={"Authorization": f"Bearer {token}"})
     try:
         with urlopen(request, timeout=TIMEOUT) as response:
             if response.status != 200:
-                raise MqttUnavailable(
-                    f"The Home Assistant MQTT service is not available (HTTP {response.status}). "
-                    + _INSTALL_HINT
-                )
+                raise _unavailable(f"is not available (HTTP {response.status})")
             body = json.load(response)
     except URLError as e:  # includes HTTPError for non-2xx responses
         detail = f"HTTP {e.code}" if hasattr(e, "code") else type(e).__name__
-        raise MqttUnavailable(
-            f"The Home Assistant MQTT service is not available ({detail}). " + _INSTALL_HINT
-        ) from None
+        raise _unavailable(f"is not available ({detail})") from None
     except (OSError, ValueError) as e:  # timeouts, resets, invalid JSON
-        raise MqttUnavailable(
-            f"The Home Assistant MQTT service could not be read ({type(e).__name__}). "
-            + _INSTALL_HINT
-        ) from None
+        raise _unavailable(f"could not be read ({type(e).__name__})") from None
     data = body.get("data") if isinstance(body, dict) else None
     if not isinstance(data, dict) or not data.get("host") or not isinstance(data.get("port"), int):
-        raise MqttUnavailable(
-            "The Home Assistant MQTT service returned an unexpected response. " + _INSTALL_HINT
-        )
+        raise _unavailable("returned an unexpected response")
     return data
 
 
