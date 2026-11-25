@@ -1,0 +1,27 @@
+# Synthetic pecron-monitor --setup output. TSL entries are from an F3000LFP
+# (issue #2); the account, keys and addresses are fake.
+email: someone@example.com
+password: not-a-real-password
+region: na
+devices:
+  - product_key: pkF3000
+    device_key: a1b2c3d4e5f6
+    name: F3000LFP
+    lan_ip: 192.0.2.10
+    auth_key: c2VjcmV0LWF1dGgta2V5IQ==
+    tsl_cache:
+      ac_switch_hm: {access: RW, desc: Ac output, id: 40, type: BOOL}
+      dc_switch_hm: {access: RW, desc: Dc output, id: 38, type: BOOL}
+      battery_percentage: {access: R, desc: Battery charge, id: 1, type: INT}
+      total_input_power: {access: R, desc: Total input, id: 4, type: INT}
+      total_output_power: {access: R, desc: Total output, id: 5, type: INT}
+  - product_key: pkF1000
+    device_key: 0a0b0c0d0e0f
+    name: F1000LFP
+alerts:
+  telegram:
+    enabled: false
+rules:
+  - name: Low battery AC off
+    condition: battery_percentage <= 10
+    action: ac_switch_hm=false

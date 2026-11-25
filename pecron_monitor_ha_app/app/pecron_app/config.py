@@ -113,6 +113,11 @@ def app_config_folder(environ: Mapping[str, str]) -> str:
     return "the folder ending in `_pecron_monitor_ha_app`"
 
 
+def setup_file_location() -> str:
+    """Where the user puts the setup file, as they see it."""
+    return f"{SETUP_FILE_NAME} in the app config folder {app_config_folder(os.environ)}"
+
+
 def known_models() -> list[str]:
     import constants  # the library's module, imported lazily
 
@@ -187,7 +192,6 @@ def validate(options: dict, tsl: dict | None) -> list[str]:
     account = options["account"]
     devices = options["devices"]
     poll = options["polling"]["poll_interval"]
-    folder = app_config_folder(os.environ)
 
     if not devices:
         msg = (
@@ -195,10 +199,7 @@ def validate(options: dict, tsl: dict | None) -> list[str]:
             f"{LABELS['devices']}, save, and start the app."
         )
         if mode == LOCAL_ONLY:
-            msg += (
-                f" For Local only, also place {SETUP_FILE_NAME} in the app config folder "
-                f"{folder}, which now exists."
-            )
+            msg += f" For Local only, also place {setup_file_location()}, which now exists."
         errors.append(msg)
 
     if uses_cloud:
@@ -293,10 +294,34 @@ def validate(options: dict, tsl: dict | None) -> list[str]:
                 f"{name}: {LABELS['devices.ble']} and {LABELS['devices.ble_address']} are not "
                 "supported in this version and are ignored."
             )
+        if tsl is not None and key and key.lower() not in tsl:
+            if mode == LOCAL_ONLY:
+                errors.append(
+                    f"{name}: no tsl_cache for this device in {setup_file_location()}. Local only "
+                    "needs it to know the device's controls. Create the file by running "
+                    "pecron-monitor --setup on a computer and copying its config.yaml there under "
+                    "that name; you may trim it to the devices list with each device_key and "
+                    "tsl_cache. The Supervisor creates the folder when the app first starts."
+                )
+            elif mode == AUTOMATIC and lan_ip and auth_key:
+                warnings.append(
+                    f"{name}: no tsl_cache for this device in {setup_file_location()}. If the "
+                    "Pecron cloud is unreachable when the app starts, default controls are used: "
+                    "entities may be wrong and switches may control the wrong output until the "
+                    "app restarts with the cloud reachable or the setup file in place."
+                )
         if models and device.get("model") and device["model"] not in models:
             warnings.append(
                 f"{name}: {LABELS['devices.model']} {device['model']} is not a model the library "
                 f"knows (case-sensitive). Known models: {', '.join(models)}."
+            )
+
+    if tsl:
+        unmatched = sorted(normalize_device_key(k) for k in set(tsl) - set(seen))
+        if unmatched:
+            warnings.append(
+                f"{setup_file_location()} has devices that are not configured: "
+                f"{', '.join(unmatched)}. Their tsl_cache is ignored."
             )
 
     if errors:

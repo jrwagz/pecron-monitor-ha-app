@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+
 from pecron_app import config as cfg
 from pecron_app.broker import MqttSettings
 from pecron_app.config import ConfigError
