@@ -32,6 +32,38 @@ attractify-logan and contributors, which does all the device communication. See
 the [third-party notices](pecron_monitor_ha_app/THIRD_PARTY_NOTICES.md). This
 repository is under the [MIT License](LICENSE).
 
-## For maintainers
+## Development
 
-See [RELEASING.md](RELEASING.md).
+CI uses Python 3.14. From the repository root, set up an environment, install
+the pinned pecron-monitor library and run the tests:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+tests/install_library.sh
+pytest
+```
+
+Linters (`tests/shellcheck.sh` needs
+[ShellCheck](https://www.shellcheck.net/) installed):
+
+```bash
+ruff check .
+ruff format --check .
+yamllint --strict .
+tests/shellcheck.sh
+```
+
+The smoke test runs a built image against a throwaway MQTT broker. It needs only
+Docker and uses no real devices or accounts:
+
+```bash
+docker build -t pecron-app pecron_monitor_ha_app
+tests/smoke/run.sh pecron-app
+```
+
+[CI](.github/workflows/ci.yaml) runs these and a few more checks. To try changes
+on Home Assistant, see
+[testing a local copy](RELEASING.md#testing-a-local-copy-on-home-assistant). To
+publish a version, see [RELEASING.md](RELEASING.md).

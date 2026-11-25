@@ -56,9 +56,22 @@ a schema or option change merged to `main` is visible to **new installs**
 immediately, while they still get the previous image. Release soon after
 merging such a change.
 
-For the same reason, to test a local copy of the app folder on Home Assistant,
-comment out `image` in the copy. Otherwise the published image is pulled
-instead of building your copy.
+## Testing a local copy on Home Assistant
+
+1. With the **Terminal & SSH** app (10.5.0 or later), copy the
+   `pecron_monitor_ha_app` folder into `/local_apps/`.
+2. If `config.yaml` in the copy has an `image` line, comment it out. Otherwise
+   the published image is pulled instead of building your copy.
+3. In **Settings > Apps > Install app**, open the menu, choose **Check for
+   updates**, then install the local app. Stop any other installed copy of the
+   app first: they use the same MQTT client id.
+
+The local install has its own app config folder,
+`/app_configs/local_pecron_monitor_ha_app`.
+
+After changing code, use **Rebuild** on the app's page. Rebuild does **not**
+reload the AppArmor profile: after changing `apparmor.txt`, also change
+`version` in the copy's `config.yaml`, check for updates and update the app.
 
 ## Recovering from a failed release
 
@@ -93,7 +106,8 @@ next patch version instead. Otherwise finish by hand, from the step that failed.
 
   Then do the following steps.
 - **Git tag and GitHub release** (use the commit the workflow ran on; skip the
-  command if the release exists):
+  command if the release exists; for a pre-release such as `1.2.3-rc.1`, add
+  `--prerelease`):
 
   ```bash
   python3 .github/scripts/release.py notes X.Y.Z > /tmp/notes.md
@@ -104,6 +118,7 @@ next patch version instead. Otherwise finish by hand, from the step that failed.
   last command is needed:
 
   ```bash
+  git fetch origin
   git switch -c release/vX.Y.Z origin/main
   python3 .github/scripts/release.py bump X.Y.Z
   git commit -m "Release X.Y.Z to users" pecron_monitor_ha_app/config.yaml

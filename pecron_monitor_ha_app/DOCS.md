@@ -219,7 +219,7 @@ folder whose name ends in `_pecron_monitor_ha_app`. Using the Samba share app:
    each device it found.
 
 If you already use the **Terminal & SSH** app, the same folder is under
-`/app_configs/` (`/addon_configs/` in older versions).
+`/app_configs/` (`/addon_configs/` before version 10.5.0 of that app).
 
 ### Risk of Automatic mode without the setup file
 
@@ -481,8 +481,9 @@ or `pecron-monitor` on another computer. Stop one of them.
 1. Stop the app.
 2. In the `pecron-setup` folder, activate the environment again (`source
    venv/bin/activate`).
-3. **Make sure `config.yaml` there says `rules: []`.** With the wizard's example
-   rule, a diagnostic run can switch AC output off.
+3. **Make sure the wizard's `config.yaml` says `rules: []`** (it is inside
+   `venv`; see [setup wizard](#setup-wizard-on-your-computer)). With the
+   wizard's example rule, a diagnostic run can switch AC output off.
 4. Run `pecron-monitor --diagnose` (login, device check and a short data test)
    or `pecron-monitor --controls` (lists the controls of each device). Both need
    the cloud.

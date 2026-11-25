@@ -108,7 +108,7 @@ def load_options(path: str) -> dict:
 
 
 def app_config_folder(environ: Mapping[str, str]) -> str:
-    """User-visible name of this app's config folder (under /addon_configs)."""
+    """User-visible name of this app's config folder."""
     hostname = environ.get("HOSTNAME", "")
     if hostname.endswith("-pecron-monitor-ha-app"):
         return hostname.replace("-", "_")
