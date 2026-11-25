@@ -1,0 +1,176 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, for example 0.2.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Releases never overlap, and a running one is never cancelled.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      architectures: ${{ steps.info.outputs.architectures }}
+    steps:
+      - name: Require the main branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Run the release workflow from main."
+          exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # all tags, for the version ordering check
+          persist-credentials: false
+      - name: Log in to the registry
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+      - name: Check the release preconditions
+        run: python3 .github/scripts/release.py validate "$VERSION"
+      - name: Read the app manifest
+        id: info
+        run: echo "architectures=$(yq -o=json -I=0 .arch pecron_monitor_ha_app/config.yaml)" >> "$GITHUB_OUTPUT"
+      - name: Prepare build matrix
+        id: matrix
+        uses: home-assistant/builder/actions/prepare-multi-arch-matrix@7412f0023ea9b6e58e8bb5059f1660f51376f49a # 2026.09.0
+        with:
+          architectures: ${{ steps.info.outputs.architectures }}
+          image-name: pecron-monitor-ha-app
+          registry-prefix: ghcr.io/${{ github.repository_owner }}
+
+  # Linters, tests, and the smoke test on a locally loaded build. Nothing is
+  # pushed until all of it passes.
+  checks:
+    name: Checks
+    needs: validate
+    uses: ./.github/workflows/ci.yaml
+
+  build:
+    name: Push ${{ matrix.arch }} image
+    needs: [validate, checks]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.validate.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Log in to the registry
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+      # Checked again here: "Re-run failed jobs" skips the validate job.
+      - name: Refuse to overwrite a published release
+        run: python3 .github/scripts/release.py manifest-absent "$VERSION"
+      - name: Build, push and sign
+        uses: home-assistant/builder/actions/build-image@7412f0023ea9b6e58e8bb5059f1660f51376f49a # 2026.09.0
+        with:
+          arch: ${{ matrix.arch }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          context: ./pecron_monitor_ha_app
+          image: ${{ matrix.image }}
+          image-tags: ${{ inputs.version }}
+          version: ${{ inputs.version }}
+          push: "true"
+          cosign: "true"
+          cache-gha: "false"
+
+  manifest:
+    name: Publish the multi-arch manifest
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Log in to the registry
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+      - name: Refuse to overwrite a published release
+        run: python3 .github/scripts/release.py manifest-absent "$VERSION"
+      - name: Publish and sign
+        uses: home-assistant/builder/actions/publish-multi-arch-manifest@7412f0023ea9b6e58e8bb5059f1660f51376f49a # 2026.09.0
+        with:
+          architectures: ${{ needs.validate.outputs.architectures }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          image-name: pecron-monitor-ha-app
+          image-tags: ${{ inputs.version }}
+          registry-prefix: ghcr.io/${{ github.repository_owner }}
+          cosign: "true"
+
+  github-release:
+    name: Tag and GitHub release
+    needs: manifest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create the tag and the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 .github/scripts/release.py notes "$VERSION" > "$RUNNER_TEMP/notes.md"
+          flags=()
+          if [[ "$VERSION" == *-* ]]; then
+            flags+=(--prerelease)
+          fi
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"
+
+  pull-request:
+    name: Open the version pull request
+    needs: github-release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # Credentials are kept: this job pushes the release branch.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+      - name: Set version and image, then open the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch="release/v$VERSION"
+          python3 .github/scripts/release.py bump "$VERSION"
+          git switch -c "$branch"
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Release $VERSION to users" pecron_monitor_ha_app/config.yaml
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --title "Release $VERSION to users" --body \
+            "Merging this releases $VERSION to users. Before merging, check that the package is public. \
+          CI does not start on this pull request by itself: close and reopen it. See RELEASING.md."
