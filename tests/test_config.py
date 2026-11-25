@@ -24,7 +24,7 @@ def device(**overrides):
         "model": "F3000LFP",
         "product_key": "pk123",
         "device_key": "a1b2c3d4e5f6",
-        "lan_ip": "192.168.1.50",
+        "lan_ip": "192.0.2.50",
         "auth_key": AUTH_KEY,
     }
     d.update(overrides)
@@ -91,7 +91,7 @@ def test_blank_device_fields(field, label):
 
 
 def test_duplicate_device_key_case_insensitive():
-    devices = [device(), device(device_key="A1B2C3D4E5F6", lan_ip="192.168.1.51")]
+    devices = [device(), device(device_key="A1B2C3D4E5F6", lan_ip="192.0.2.51")]
     msg = one(errors_of(options(devices=devices)), "also used by")
     assert "Device 2" in msg and "Device 1" in msg
 
@@ -179,7 +179,7 @@ def test_device_key_not_hex12_warns():
 
 
 def test_invalid_dotted_ip_warns_but_hostname_is_fine():
-    one(cfg.validate(options(devices=[device(lan_ip="192.168.1.300")]), None), "IPv4")
+    one(cfg.validate(options(devices=[device(lan_ip="192.0.2.300")]), None), "IPv4")
     assert cfg.validate(options(devices=[device(lan_ip="pecron.lan")]), None) == []
 
 
@@ -271,7 +271,7 @@ def test_automatic_config():
                 "name": "F3000LFP",
                 "product_key": "pk123",
                 "device_key": "A1B2C3D4E5F6",
-                "lan_ip": "192.168.1.50",
+                "lan_ip": "192.0.2.50",
                 "auth_key": AUTH_KEY,
             }
         ],
