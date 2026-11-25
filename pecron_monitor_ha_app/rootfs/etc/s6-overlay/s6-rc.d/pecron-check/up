@@ -1,0 +1,1 @@
+/command/with-contenv python3 -m pecron_app check

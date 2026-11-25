@@ -1,0 +1,4 @@
+#!/command/with-contenv sh
+# shellcheck shell=sh
+# Supervise pecron-monitor; restarts and backoff are handled by the runner.
+exec python3 -m pecron_app run
