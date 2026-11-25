@@ -1,5 +1,6 @@
 name: "Pecron Monitor HA App"
 version: "0.1.0"
+image: ghcr.io/jrwagz/pecron-monitor-ha-app
 slug: pecron_monitor_ha_app
 description: >-
   Monitor and control Pecron portable power stations through MQTT discovery
