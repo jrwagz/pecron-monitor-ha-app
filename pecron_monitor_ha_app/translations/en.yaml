@@ -1,0 +1,207 @@
+configuration:
+  connection_mode:
+    name: Connection mode
+    description: >-
+      How the app reaches your power stations. Automatic uses the local network
+      for devices with a LAN IP and the Pecron cloud for the rest. Local only
+      never contacts the cloud. Cloud only uses cloud MQTT and REST. Cloud REST
+      only polls the cloud REST API without cloud MQTT.
+  account:
+    name: Pecron account
+    description: >-
+      Your Pecron app login. Required in Automatic, Cloud only and Cloud REST
+      only; unused in Local only.
+    fields:
+      email:
+        name: Email
+        description: >-
+          Email address of your Pecron account. Required in every mode except
+          Local only.
+      password:
+        name: Password
+        description: >-
+          Password of your Pecron account. Required in every mode except Local
+          only.
+      region:
+        name: Region
+        description: >-
+          Pecron cloud region of your account: na (North America, the default),
+          eu (Europe) or cn (China). Read in every mode.
+  devices:
+    name: Devices
+    description: >-
+      One entry per power station. Add at least one device before starting the
+      app.
+    fields:
+      model:
+        name: Model
+        description: >-
+          The model name, e.g. F3000LFP. The library uses it for model-specific
+          behaviour. The Home Assistant device is named "Pecron <model>
+          (<device_key>)"; after a successful cloud login the cloud's model name
+          is used instead, so identify devices by device key. For a friendly
+          name, rename the device in Home Assistant.
+      product_key:
+        name: Product key
+        description: >-
+          Pecron product key of this model, from the pecron-monitor setup wizard
+          or the model table in the documentation. Every mode that logs in
+          (Automatic, Cloud only, Cloud REST only) corrects a wrong value from
+          your account.
+      device_key:
+        name: Device key
+        description: >-
+          Unique key of this unit, shown in the Pecron app under Device Info.
+          Every mode that logs in (Automatic, Cloud only, Cloud REST only)
+          corrects a wrong value from your account.
+      lan_ip:
+        name: LAN IP address
+        description: >-
+          IP address or hostname of the unit on your network (give it a fixed
+          address in your router). Required in Local only. In Automatic it
+          enables local transport for this device. Unused in the cloud modes.
+      auth_key:
+        name: Local auth key
+        description: >-
+          Local encryption key of the unit, printed by the pecron-monitor setup
+          wizard. Required in Local only. Optional in Automatic, where it is
+          fetched from the cloud when reachable, but needed to start without
+          internet. Unused in the cloud modes.
+      ble:
+        name: Bluetooth
+        description: >-
+          Accepted but not supported in this version; ignored with a warning.
+      ble_address:
+        name: Bluetooth address
+        description: >-
+          Accepted but not supported in this version; ignored with a warning.
+  polling:
+    name: Polling
+    description: How often devices are read and how failed connections are retried.
+    fields:
+      poll_interval:
+        name: Poll interval
+        description: >-
+          Seconds between readings, default 70. The minimum is 63 seconds in
+          every mode except Local only, which allows down to 5.
+      cloud_retry_interval:
+        name: Cloud retry interval
+        description: >-
+          Seconds between attempts to reach the Pecron cloud after it was
+          unreachable, default 300. Used in Automatic, Cloud only and Cloud REST
+          only.
+      mqtt_reconnect_interval:
+        name: Cloud MQTT reconnect interval
+        description: >-
+          Seconds between reconnect attempts to the Pecron cloud MQTT service,
+          default 60. Used in Automatic and Cloud only.
+      high_freq_warmup_seconds:
+        name: High-frequency warm-up
+        description: >-
+          Seconds of high-frequency reporting requested from the devices at
+          startup so values appear quickly, default 60; 0 disables it. Used in
+          Automatic and Cloud only.
+  mqtt:
+    name: Home Assistant MQTT broker
+    description: >-
+      Leave the connection fields empty to use the Home Assistant MQTT broker
+      (Mosquitto app) automatically. Applies in every mode.
+    fields:
+      host:
+        name: Broker host
+        description: >-
+          Leave empty to use the Home Assistant MQTT broker automatically. Set
+          it to use another broker; the other connection fields then default
+          to port 1883 without credentials.
+      port:
+        name: Broker port
+        description: >-
+          Leave empty to use the Home Assistant MQTT broker automatically.
+          Default 1883 with a manual host. Plain TCP only, no TLS.
+      username:
+        name: Broker username
+        description: >-
+          Leave empty to use the Home Assistant MQTT broker automatically. Set
+          it to override the username.
+      password:
+        name: Broker password
+        description: >-
+          Leave empty to use the Home Assistant MQTT broker automatically. Set
+          it to override the password.
+      discovery_prefix:
+        name: Discovery prefix
+        description: >-
+          MQTT discovery prefix Home Assistant listens on, default
+          homeassistant.
+      clear_discovery_on_startup:
+        name: Clear discovery on startup
+        description: >-
+          Clear and republish the discovery messages at startup so Home
+          Assistant picks up entity changes, default on.
+      retry_interval:
+        name: Broker retry interval
+        description: >-
+          Seconds between reconnect attempts to the broker, default 60.
+      stale_after:
+        name: Unavailable after
+        description: >-
+          Seconds without a reading after which a device's entities show as
+          unavailable, default 600. Keep it at least three poll intervals.
+  energy:
+    name: Energy
+    description: Derived energy (kWh) sensors for the Energy dashboard. Applies in every mode.
+    fields:
+      energy_sensors:
+        name: Energy sensors
+        description: >-
+          Add kWh sensors integrated from the power readings, default off.
+      energy_max_gap_seconds:
+        name: Maximum gap
+        description: >-
+          Longest gap in seconds between two readings that is still
+          integrated, default 1800. Longer gaps are skipped.
+  restore_outputs_after_shutdown:
+    name: Restore outputs after shutdown
+    description: >-
+      Switch the AC and DC outputs back to their earlier state after a unit
+      shut down on low battery and came back. Works only when cloud MQTT is
+      connected (Automatic or Cloud only).
+    fields:
+      enabled:
+        name: Enabled
+        description: >-
+          Turn output restore on, default off. Works only when cloud MQTT is
+          connected.
+      shutdown_threshold_pct:
+        name: Shutdown threshold
+        description: >-
+          Battery percentage at or below which a unit going offline counts as a
+          low-battery shutdown, default 10.
+      shutdown_threshold_voltage:
+        name: Shutdown voltage threshold
+        description: >-
+          Optional battery voltage (V) that must also be reached for a
+          low-battery shutdown. No default.
+      minimum_offline_seconds:
+        name: Minimum offline time
+        description: >-
+          Seconds a unit must have been offline before outputs are restored,
+          default 120.
+      retry_interval_seconds:
+        name: Restore retry interval
+        description: >-
+          Seconds between restore attempts, default 30.
+      retry_timeout_seconds:
+        name: Restore timeout
+        description: >-
+          Seconds after which restore attempts stop, default 600.
+      snapshot_max_age_seconds:
+        name: Snapshot maximum age
+        description: >-
+          Oldest output snapshot in seconds that is still restored, default
+          86400 (one day).
+  log_level:
+    name: Log level
+    description: >-
+      Amount of log output, default info. trace and debug also turn on the
+      library's verbose output.
