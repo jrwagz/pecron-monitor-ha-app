@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_call: # release.yaml runs these checks before it pushes anything
   pull_request:
   push:
     branches:
@@ -10,7 +11,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # github.workflow is the caller's name in a release, so a push to main does
+  # not cancel the checks of a running release.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
