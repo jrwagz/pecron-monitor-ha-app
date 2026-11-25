@@ -20,4 +20,7 @@ RUN pip install --no-cache-dir --no-deps \
         "https://github.com/attractify-logan/pecron-monitor/archive/${PECRON_MONITOR_SHA}.tar.gz" \
     && pip check
 
+COPY app /opt/pecron_app
+ENV PYTHONPATH=/opt/pecron_app
+
 COPY THIRD_PARTY_NOTICES.md /usr/share/doc/pecron-monitor-ha-app/THIRD_PARTY_NOTICES.md
