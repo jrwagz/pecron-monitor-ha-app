@@ -10,7 +10,7 @@ arch:
   - aarch64
   - amd64
 init: false
-timeout: "thirty"
+timeout: 30
 services:
   - "mqtt:need"
 map:
