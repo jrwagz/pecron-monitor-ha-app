@@ -140,3 +140,7 @@ jobs:
         env:
           IMAGE: ${{ matrix.image }}:ci
         run: docker run --rm --entrypoint python3 "$IMAGE" -c "import monitor, ha_bridge, cloud_api"
+      - name: Smoke test
+        env:
+          IMAGE: ${{ matrix.image }}:ci
+        run: tests/smoke/run.sh "$IMAGE"
