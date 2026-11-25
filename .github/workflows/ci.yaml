@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_DIR: pecron_monitor_ha_app
+
+jobs:
+  app-lint:
+    name: HA app linter
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: frenck/action-addon-linter@d51677290aef26cdfc835271dd3c7343ce502809 # v2.21.2
+        with:
+          path: ./pecron_monitor_ha_app
+
+  lint:
+    name: Linters
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Install Python tools
+        run: pip install -r requirements-dev.txt
+      - name: hadolint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: pecron_monitor_ha_app/Dockerfile
+      - name: shellcheck
+        run: tests/shellcheck.sh
+      - name: yamllint
+        run: yamllint --strict .
+      - name: JSON parse check
+        run: |
+          git ls-files -z '*.json' | while IFS= read -r -d '' f; do
+            jq empty "$f" || { echo "::error file=$f::invalid JSON"; exit 1; }
+          done
+      - name: actionlint
+        run: >-
+          docker run --rm -v "$PWD:/repo" --workdir /repo
+          rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+          -color
+      - name: ruff
+        run: ruff check .
+
+  test:
+    name: pytest
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: pytest
+        run: pytest
+
+  prepare-build:
+    name: Prepare build matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      version: ${{ steps.info.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read app manifest
+        id: info
+        run: |
+          echo "version=$(yq -r .version "$APP_DIR/config.yaml")" >> "$GITHUB_OUTPUT"
+          echo "architectures=$(yq -o=json -I=0 .arch "$APP_DIR/config.yaml")" >> "$GITHUB_OUTPUT"
+      - name: Prepare build matrix
+        id: matrix
+        uses: home-assistant/builder/actions/prepare-multi-arch-matrix@7412f0023ea9b6e58e8bb5059f1660f51376f49a # 2026.09.0
+        with:
+          architectures: ${{ steps.info.outputs.architectures }}
+          image-name: pecron-monitor-ha-app
+          registry-prefix: ghcr.io/${{ github.repository_owner }}
+
+  build:
+    name: Build ${{ matrix.arch }} image
+    needs: prepare-build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare-build.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build image
+        uses: home-assistant/builder/actions/build-image@7412f0023ea9b6e58e8bb5059f1660f51376f49a # 2026.09.0
+        with:
+          arch: ${{ matrix.arch }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          context: ./pecron_monitor_ha_app
+          image: ${{ matrix.image }}
+          image-tags: ci
+          version: ${{ needs.prepare-build.outputs.version }}
+          push: "false"
+          load: "true"
+          cosign: "false"
+          cache-gha: "false"
+      # Images are loaded into this runner only; later image tests must run in this job.
+      - name: Check library version in image
+        env:
+          IMAGE: ${{ matrix.image }}:ci
+        run: |
+          expected=$(sed -n 's/^ARG PECRON_MONITOR_VERSION=v\{0,1\}//p' "$APP_DIR/Dockerfile")
+          actual=$(docker run --rm --entrypoint pecron-monitor "$IMAGE" --version)
+          echo "expected: pecron-monitor ${expected}, got: ${actual}"
+          test "$actual" = "pecron-monitor ${expected}"
+      - name: Check library imports in image
+        env:
+          IMAGE: ${{ matrix.image }}:ci
+        run: docker run --rm --entrypoint python3 "$IMAGE" -c "import monitor, ha_bridge, cloud_api"
