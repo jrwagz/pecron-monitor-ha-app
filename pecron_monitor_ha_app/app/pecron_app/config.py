@@ -275,7 +275,7 @@ def validate(options: dict, tsl: dict | None) -> list[str]:
         if auth_key and not _is_base64(auth_key):
             errors.append(
                 f"{name}: {LABELS['devices.auth_key']} is not valid base64. Copy it again "
-                "from the pecron-monitor setup wizard output."
+                "from auth_key in the config.yaml written by the pecron-monitor setup wizard."
             )
         if mode == AUTOMATIC and auth_key and not lan_ip:
             warnings.append(
