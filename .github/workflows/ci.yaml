@@ -120,6 +120,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare-build.outputs.matrix) }}
+    env:
+      IMAGE: ${{ matrix.image }}:ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -139,18 +141,12 @@ jobs:
           cache-gha: "false"
       # Images are loaded into this runner only; later image tests must run in this job.
       - name: Check library version in image
-        env:
-          IMAGE: ${{ matrix.image }}:ci
         run: |
           expected=$(sed -n 's/^ARG PECRON_MONITOR_VERSION=v\{0,1\}//p' "$APP_DIR/Dockerfile")
           actual=$(docker run --rm --entrypoint pecron-monitor "$IMAGE" --version)
           echo "expected: pecron-monitor ${expected}, got: ${actual}"
           test "$actual" = "pecron-monitor ${expected}"
       - name: Check library imports in image
-        env:
-          IMAGE: ${{ matrix.image }}:ci
         run: docker run --rm --entrypoint python3 "$IMAGE" -c "import monitor, ha_bridge, cloud_api"
       - name: Smoke test
-        env:
-          IMAGE: ${{ matrix.image }}:ci
         run: tests/smoke/run.sh "$IMAGE"
