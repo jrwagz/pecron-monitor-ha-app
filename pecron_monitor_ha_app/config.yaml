@@ -1,0 +1,73 @@
+name: "Pecron Monitor HA App"
+version: "0.1.0"
+slug: pecron_monitor_ha_app
+description: >-
+  Monitor and control Pecron portable power stations through MQTT discovery
+  entities, using the pecron-monitor library.
+url: https://github.com/jrwagz/pecron-monitor-ha-app
+stage: experimental
+arch:
+  - aarch64
+  - amd64
+init: false
+timeout: 30
+services:
+  - "mqtt:need"
+map:
+  - type: app_config
+    read_only: true
+options:
+  connection_mode: Automatic
+  account:
+    email: ""
+    password: ""
+    region: na
+  devices: []
+  polling:
+    poll_interval: 70
+  mqtt: {}
+  energy:
+    energy_sensors: false
+  restore_outputs_after_shutdown:
+    enabled: false
+  log_level: info
+schema:
+  connection_mode: list(Automatic|Local only|Cloud only|Cloud REST only)
+  account:
+    email: str?
+    password: password?
+    region: list(na|eu|cn)
+  devices:
+    - model: str
+      product_key: str
+      device_key: str
+      lan_ip: str?
+      auth_key: password?
+      ble: bool?
+      ble_address: str?
+  polling:
+    poll_interval: int(5,86400)
+    cloud_retry_interval: int(1,)?
+    mqtt_reconnect_interval: int(1,)?
+    high_freq_warmup_seconds: int(0,)?
+  mqtt:
+    host: str?
+    port: port?
+    username: str?
+    password: password?
+    discovery_prefix: str?
+    clear_discovery_on_startup: bool?
+    retry_interval: int(1,)?
+    stale_after: int(1,)?
+  energy:
+    energy_sensors: bool?
+    energy_max_gap_seconds: int(1,)?
+  restore_outputs_after_shutdown:
+    enabled: bool
+    shutdown_threshold_pct: int(0,100)?
+    shutdown_threshold_voltage: float(0,)?
+    minimum_offline_seconds: int(0,)?
+    retry_interval_seconds: int(1,)?
+    retry_timeout_seconds: int(1,)?
+    snapshot_max_age_seconds: int(1,)?
+  log_level: list(trace|debug|info|notice|warning|error|fatal)
