@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import contextlib
 import ipaddress
 import json
 import os
@@ -107,7 +108,7 @@ def load_options(path: str) -> dict:
 
 
 def app_config_folder(environ: Mapping[str, str]) -> str:
-    """User-visible name of this app's config folder (under /addon_configs)."""
+    """User-visible name of this app's config folder."""
     hostname = environ.get("HOSTNAME", "")
     if hostname.endswith("-pecron-monitor-ha-app"):
         return hostname.replace("-", "_")
@@ -275,7 +276,7 @@ def validate(options: dict, tsl: dict | None) -> list[str]:
         if auth_key and not _is_base64(auth_key):
             errors.append(
                 f"{name}: {LABELS['devices.auth_key']} is not valid base64. Copy it again "
-                "from the pecron-monitor setup wizard output."
+                "from auth_key in the config.yaml written by the pecron-monitor setup wizard."
             )
         if mode == AUTOMATIC and auth_key and not lan_ip:
             warnings.append(
@@ -409,8 +410,6 @@ def write_config(config: dict, path: str) -> None:
         os.chmod(tmp, 0o600)
         os.replace(tmp, path)
     except BaseException:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp)
-        except FileNotFoundError:
-            pass
         raise

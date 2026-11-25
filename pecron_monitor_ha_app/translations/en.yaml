@@ -52,8 +52,7 @@ configuration:
         name: Device key
         description: >-
           Unique key of this unit, shown in the Pecron app under Device Info.
-          Every mode that logs in (Automatic, Cloud only, Cloud REST only)
-          corrects a wrong value from your account.
+          A wrong value is never corrected.
       lan_ip:
         name: LAN IP address
         description: >-
@@ -63,8 +62,8 @@ configuration:
       auth_key:
         name: Local auth key
         description: >-
-          Local encryption key of the unit, printed by the pecron-monitor setup
-          wizard. Required in Local only. Optional in Automatic, where it is
+          Local encryption key of the unit, written by the pecron-monitor setup
+          wizard to auth_key in its config.yaml. Required in Local only. Optional in Automatic, where it is
           fetched from the cloud when reachable, but needed to start without
           internet. Unused in the cloud modes.
       ble:
@@ -87,9 +86,8 @@ configuration:
       cloud_retry_interval:
         name: Cloud retry interval
         description: >-
-          Seconds between attempts to reach the Pecron cloud after it was
-          unreachable, default 300. Used in Automatic, Cloud only and Cloud REST
-          only.
+          Seconds between attempts to reach the Pecron cloud again after a
+          fallback to local access, default 300. Used in Automatic.
       mqtt_reconnect_interval:
         name: Cloud MQTT reconnect interval
         description: >-
@@ -180,8 +178,8 @@ configuration:
       shutdown_threshold_voltage:
         name: Shutdown voltage threshold
         description: >-
-          Optional battery voltage (V) that must also be reached for a
-          low-battery shutdown. No default.
+          Optional battery voltage (V) at or below which a unit going offline
+          also counts as a low-battery shutdown. No default.
       minimum_offline_seconds:
         name: Minimum offline time
         description: >-

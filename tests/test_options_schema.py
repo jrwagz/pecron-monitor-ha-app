@@ -37,6 +37,13 @@ def translation_for(path):
     return entry
 
 
+def test_every_schema_key_path_is_documented():
+    docs = (APP / "DOCS.md").read_text()
+    paths = [".".join(path) for path in schema_paths(MANIFEST["schema"])]
+    assert "devices.lan_ip" in paths
+    assert [p for p in paths if f"`{p}`" not in docs] == []
+
+
 def test_every_schema_key_has_name_and_description():
     for path in schema_paths(MANIFEST["schema"]):
         entry = translation_for(path)
