@@ -16,6 +16,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 from collections.abc import Mapping, Sequence
 from importlib import metadata
 from typing import TextIO
@@ -64,7 +65,9 @@ class Output:
         self._show_unlevelled = True  # decision of the previous library line
 
     def add_secrets(self, *values: str | None) -> None:
-        new = {v for v in values if v} | set(self.secrets)
+        # Also the trimmed form: validate() trims email and auth keys before the
+        # library sees (and may log) them.
+        new = {form for v in values if v for form in (v, v.strip()) if form} | set(self.secrets)
         # Longest first, so a secret containing another is replaced whole.
         self.secrets = sorted(new, key=len, reverse=True)
 
@@ -90,6 +93,10 @@ class Output:
 
     def error(self, message: str) -> None:
         self.log(logging.ERROR, message, always=True)
+
+    def new_child(self) -> None:
+        """Unlevelled lines before a new child's first levelled line are shown."""
+        self._show_unlevelled = True
 
     def library(self, line: str) -> None:
         match = _LIBRARY_LINE.match(line)
@@ -133,13 +140,25 @@ def _device_label(device: dict) -> str:
     return f"{device.get('model', '?')} ({normalize_device_key(device.get('device_key', ''))})"
 
 
-def _load(options_path: str, setup_path: str) -> tuple[dict, dict | None, list[str]]:
-    """Load options and the setup file; return (options, tsl or None, file errors)."""
-    options = cfg.load_options(options_path)
+def _open(options_path: str, environ: Mapping[str, str], stream: TextIO | None):
+    """Load the options and set up output at their log level; None if unreadable."""
     try:
-        return options, load_tsl(setup_path), []
+        options = cfg.load_options(options_path)
+    except (OSError, ValueError, ConfigError) as e:
+        Output(stream=stream).error(f"Cannot read the app options ({type(e).__name__}).")
+        return None
+    output = Output(options.get("log_level", "info"), stream)
+    output.add_secrets(*_secrets(options, environ))
+    _attach_logging(output)
+    return output, options
+
+
+def _load_tsl(setup_path: str) -> tuple[dict | None, list[str]]:
+    """Load the setup file; return (tsl or None, file errors)."""
+    try:
+        return load_tsl(setup_path), []
     except ConfigError as e:
-        return options, None, e.errors
+        return None, e.errors
 
 
 def _report_errors(output: Output, errors: Sequence[str]) -> None:
@@ -155,17 +174,25 @@ def check(
     stream: TextIO | None = None,
 ) -> int:
     """Validate everything once and print all errors and warnings. Returns the exit code."""
-    output = Output(stream=stream)
-    try:
-        options = cfg.load_options(options_path)
-    except (OSError, ValueError, ConfigError) as e:
-        output.error(f"Cannot read the app options ({type(e).__name__}).")
+    opened = _open(options_path, environ, stream)
+    if opened is None:
         return 1
-    output = Output(options.get("log_level", "info"), stream)
-    output.add_secrets(*_secrets(options, environ))
-    _attach_logging(output)
+    output, options = opened
+    try:
+        return _check(output, options, setup_path)
+    except Exception:
+        _report_crash(output)
+        return 1
 
-    options, tsl, errors = _load(options_path, setup_path)
+
+def _report_crash(output: Output) -> None:
+    output.error("Unexpected error:")
+    for line in traceback.format_exc().splitlines():
+        output.error(line)
+
+
+def _check(output: Output, options: dict, setup_path: str) -> int:
+    tsl, errors = _load_tsl(setup_path)
     warnings: list[str] = []
     try:
         warnings = cfg.validate(options, tsl)
@@ -220,7 +247,14 @@ class Runner:
     # --- signals ---------------------------------------------------------
 
     def stop(self, *_args) -> None:
-        """Signal handler: stop the child (SIGTERM, SIGKILL after the grace) and exit."""
+        """Signal handler: stop the child (SIGTERM, SIGKILL after the grace) and exit.
+
+        Runs on a thread: Event.set() takes a lock the interrupted main thread
+        may be holding inside Event.wait().
+        """
+        threading.Thread(target=self._stop, daemon=True).start()
+
+    def _stop(self) -> None:
         self.stopping.set()
         child = self._child
         if child is not None and child.poll() is None:
@@ -237,9 +271,10 @@ class Runner:
     # --- main loop -------------------------------------------------------
 
     def _prepare(self) -> tuple[dict, list[str]]:
-        """Load, validate, validate, resolve the broker, write the library config."""
-        options, tsl, errors = _load(self.options_path, self.setup_path)
+        """Load, validate, resolve the broker, write the library config."""
+        options = cfg.load_options(self.options_path)
         self.output.add_secrets(*_secrets(options, self.environ))
+        tsl, errors = _load_tsl(self.setup_path)
         try:
             cfg.validate(options, tsl)  # pecron-check already printed the warnings
         except ConfigError as e:
@@ -252,7 +287,7 @@ class Runner:
         mqtt = resolve_mqtt(options, self.environ)
         self.output.add_secrets(mqtt.password)
         cfg.write_config(cfg.build_library_config(options, mqtt, tsl), self.config_path)
-        return options, cfg.library_args(options)
+        return options, cfg.library_args(options, self.config_path)
 
     def _banner(self, options: dict) -> None:
         try:
@@ -275,7 +310,7 @@ class Runner:
             env=env,
         )
         if self.stopping.is_set():  # a signal arrived before _child was set
-            self.stop()
+            self._stop()
         return self._child
 
     def _relay(self, child: subprocess.Popen, options: dict) -> str | None:
@@ -283,6 +318,7 @@ class Runner:
         last_error = None
         in_traceback = False
         ready = False
+        self.output.new_child()
         assert child.stdout is not None
         for raw in child.stdout:
             line = raw.rstrip("\n")
@@ -295,6 +331,7 @@ class Runner:
                 in_traceback = True
             elif in_traceback and line and not line[0].isspace():
                 last_error = line  # the exception line ends the traceback
+                in_traceback = False
             self.output.library(line)
             if not ready and READY_MARKER in line:
                 ready = True
@@ -307,14 +344,17 @@ class Runner:
         return self.output.redact(last_error) if last_error else None
 
     def run(self) -> int:
-        try:
-            options = cfg.load_options(self.options_path)
-        except (OSError, ValueError, ConfigError) as e:
-            self.output.error(f"Cannot read the app options ({type(e).__name__}).")
+        opened = _open(self.options_path, self.environ, self.output.stream)
+        if opened is None:
             return 1
-        self.output = Output(options.get("log_level", "info"), self.output.stream)
-        _attach_logging(self.output)
+        self.output = opened[0]
+        try:
+            return self._loop()
+        except Exception:
+            _report_crash(self.output)
+            return 1
 
+    def _loop(self) -> int:
         step = 0  # index into the delays
         retry = 0  # retries since the last reset, for the log
         while not self.stopping.is_set():
@@ -334,8 +374,6 @@ class Runner:
                 child = self._start_child(args)
                 last_error = self._relay(child, options)
                 ran_for = time.monotonic() - started
-                if self.stopping.is_set():
-                    break
                 code = child.returncode
                 cause = (
                     f"pecron-monitor was killed by signal {-code}"
@@ -351,6 +389,8 @@ class Runner:
                         "under Pecron account."
                     )
 
+            if self.stopping.is_set():
+                break
             if ran_for >= self.reset_after:
                 step = retry = 0
             if login_rejected:  # retrying soon cannot help

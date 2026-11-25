@@ -15,11 +15,12 @@ import os
 import re
 import tempfile
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
-from .broker import MqttSettings
+if TYPE_CHECKING:
+    from .broker import MqttSettings
 
 AUTOMATIC = "Automatic"
 LOCAL_ONLY = "Local only"
@@ -385,8 +386,8 @@ def build_library_config(options: dict, mqtt: MqttSettings, tsl: dict | None) ->
     return config
 
 
-def library_args(options: dict) -> list[str]:
-    args = ["--config", LIBRARY_CONFIG_PATH, "--homeassistant", "--no-ble"]
+def library_args(options: dict, config_path: str = LIBRARY_CONFIG_PATH) -> list[str]:
+    args = ["--config", config_path, "--homeassistant", "--no-ble"]
     args += {
         AUTOMATIC: [],
         LOCAL_ONLY: ["--local"],

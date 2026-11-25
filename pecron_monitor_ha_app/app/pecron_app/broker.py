@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+from .config import ConfigError
+
 log = logging.getLogger(__name__)
 
 SERVICE_URL = "http://supervisor/services/mqtt"
@@ -68,9 +70,6 @@ def _fetch_service(token: str) -> dict:
 
 
 def resolve_mqtt(options: dict, environ: Mapping[str, str]) -> MqttSettings:
-    # Imported here: config imports this module for MqttSettings.
-    from .config import ConfigError
-
     manual = options.get("mqtt") or {}
     if manual.get("host"):
         settings = MqttSettings(

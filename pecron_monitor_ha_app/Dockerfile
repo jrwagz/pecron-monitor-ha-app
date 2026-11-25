@@ -24,7 +24,9 @@ COPY app /opt/pecron_app
 ENV PYTHONPATH=/opt/pecron_app
 
 # Give the runner time to stop pecron-monitor (10 s grace) before s6 kills it.
-ENV S6_SERVICES_GRACETIME=12000
+# Stop the container when pecron-check fails (also the base image default).
+ENV S6_SERVICES_GRACETIME=12000 \
+    S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 COPY rootfs /
 
 COPY THIRD_PARTY_NOTICES.md /usr/share/doc/pecron-monitor-ha-app/THIRD_PARTY_NOTICES.md

@@ -192,7 +192,7 @@ def test_child_gets_args_env_and_config(env):
     args = env.child_args
     assert args["args"] == [
         "--config",
-        "/data/pecron-monitor.yaml",
+        str(env.config_path),
         "--homeassistant",
         "--no-ble",
     ]
@@ -455,3 +455,64 @@ def test_library_still_logs_the_markers():
 
     assert runner_mod.READY_MARKER in Path(ha_discovery.__file__).read_text()
     assert runner_mod.LOGIN_REJECTED_MARKER in Path(cloud_api.__file__).read_text()
+
+
+# --- review regressions ------------------------------------------------------
+
+
+def test_trimmed_secrets_are_redacted(env):
+    opts = options()
+    opts["account"]["email"] = "  me@example.com "
+    opts["devices"][0]["auth_key"] = f" {AUTH_KEY}  "
+    env.write_options(opts)
+    env.plan({"exit": 1, "lines": [f"12:00:00 INFO login me@example.com key {AUTH_KEY}"]})
+    run_with_waits(env.runner(), 1)
+    assert "me@example.com" not in env.out and AUTH_KEY not in env.out
+
+
+def test_unlevelled_lines_shown_at_start_of_each_child(env):
+    env.write_options(options(log_level="info"))
+    env.plan(
+        {"exit": 1, "lines": ["12:00:00 DEBUG filtered", "filtered continuation"]},
+        {"exit": 1, "lines": ["Traceback (most recent call last):", "ImportError: boom"]},
+    )
+    run_with_waits(env.runner(), 2)
+    assert "filtered" not in env.out
+    assert "ImportError: boom" in env.out
+
+
+def test_print_after_traceback_is_not_the_last_error(env):
+    env.plan(
+        {
+            "exit": 1,
+            "lines": [
+                "Traceback (most recent call last):",
+                "OSError: disk gone",
+                "Goodbye from print",
+            ],
+        }
+    )
+    run_with_waits(env.runner(), 1)
+    assert "last error: OSError: disk gone" in env.out
+
+
+def test_stop_during_broker_lookup_logs_no_retry(env, monkeypatch):
+    r = env.runner()
+
+    def slow(options, environ):
+        r._stop()
+        raise MqttUnavailable("service gone")
+
+    monkeypatch.setattr(runner_mod, "resolve_mqtt", slow)
+    assert r.run() == 0
+    assert "Retry" not in env.out
+
+
+def test_unexpected_error_is_reported_redacted(env, monkeypatch):
+    def boom(config, path):
+        raise OSError(f"cannot write with {AUTH_KEY}")
+
+    monkeypatch.setattr(runner_mod.cfg, "write_config", boom)
+    assert env.runner().run() == 1
+    assert "ERROR Unexpected error:" in env.out
+    assert "OSError: cannot write with ***" in env.out
