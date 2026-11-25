@@ -21,7 +21,9 @@ RUN pip install --no-cache-dir --no-deps \
     && pip check
 
 COPY app /opt/pecron_app
-ENV PYTHONPATH=/opt/pecron_app
+# No bytecode writes at run time: the AppArmor profile keeps code read-only.
+ENV PYTHONPATH=/opt/pecron_app \
+    PYTHONDONTWRITEBYTECODE=1
 
 # Give the runner time to stop pecron-monitor (10 s grace) before s6 kills it.
 # Stop the container when pecron-check fails (also the base image default).

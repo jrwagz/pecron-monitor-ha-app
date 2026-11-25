@@ -1,0 +1,54 @@
+#include <tunables/global>
+
+# Exactly one top-level profile: the Supervisor renames it to the installed slug.
+profile pecron_monitor_ha_app flags=(attach_disconnected,mediate_deleted,complain) {
+  #include <abstractions/base>
+
+  # MQTT, the Pecron cloud, the local device protocol and DNS. No raw sockets.
+  network inet stream,
+  network inet dgram,
+  network inet6 stream,
+  network inet6 dgram,
+  unix,
+
+  # s6 supervises its services and the runner stops pecron-monitor.
+  signal (send, receive) peer=@{profile_name},
+  signal (receive) peer=unconfined,
+
+  # No capability rules: s6-overlay as configured here (root, no catch-all
+  # logger) and the app need none.
+
+  # s6-overlay, execline and the shell
+  / r,
+  /init rix,
+  /bin/ r,
+  /bin/** rmix,
+  /usr/bin/ r,
+  /usr/bin/** rmix,
+  /command/ r,
+  /command/** rmix,
+  /package/ r,
+  /package/** rmix,
+  /etc/{,**} r,
+  /etc/s6-overlay/** ix,
+  /run/{,**} rwkl,
+  /run/{s6,s6-rc*,service}/** ix,
+  /var/run/{,**} rwkl,
+  /tmp/{,**} rwk,
+  /dev/tty rw,
+  @{PROC}/{,**} r,
+
+  # Python, its libraries and pecron-monitor
+  /lib/{,**} rm,
+  /usr/lib/{,**} rm,
+  /usr/share/{,**} r,
+  /usr/local/ r,
+  /usr/local/bin/ r,
+  /usr/local/bin/** rmix,
+  /usr/local/lib/{,**} rm,
+  /opt/pecron_app/{,**} r,
+
+  # Options, generated config and state; the setup file
+  /data/{,**} rwk,
+  /config/{,**} r,
+}
