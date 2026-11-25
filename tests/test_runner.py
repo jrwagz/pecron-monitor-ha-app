@@ -455,6 +455,23 @@ def test_library_still_logs_the_markers():
     assert runner_mod.LOGIN_REJECTED_MARKER in Path(cloud_api.__file__).read_text()
 
 
+def test_library_still_honours_the_state_path_variables(monkeypatch):
+    """If a library bump renames one, that state silently stops surviving restarts."""
+    pytest.importorskip("monitor")
+    import energy_state
+    import monitor_rules
+    import output_state
+
+    for name, path in runner_mod.STATE_FILES.items():
+        monkeypatch.setenv(name, path)
+    resolved = {
+        "PECRON_STATE_PATH": output_state._state_path(),
+        "PECRON_ENERGY_STATE_PATH": energy_state.state_path(),
+        "PECRON_RULE_STATE_PATH": monitor_rules.MonitorRulesMixin._rule_state_path(None),
+    }
+    assert {name: str(path) for name, path in resolved.items()} == runner_mod.STATE_FILES
+
+
 # --- review regressions ------------------------------------------------------
 
 

@@ -166,6 +166,21 @@ def test_the_repository_changelog_covers_the_current_version():
     assert release.notes((ROOT / release.CHANGELOG).read_text(), version)
 
 
+def test_the_guard_checks_the_image_the_workflow_publishes():
+    """A mismatch would make every "already published" check pass silently."""
+    jobs = yaml.safe_load((ROOT / ".github/workflows/release.yaml").read_text())["jobs"]
+    owner = yaml.safe_load((ROOT / "repository.yaml").read_text())["url"].split("/")[-2]
+    for job, publisher in (("build", "build-image"), ("manifest", "publish-multi-arch-manifest")):
+        steps = jobs[job]["steps"]
+        guard = next(i for i, s in enumerate(steps) if "manifest-absent" in s.get("run", ""))
+        publish = next(i for i, s in enumerate(steps) if publisher in s.get("uses", ""))
+        assert guard < publish, job
+    inputs = steps[publish]["with"]
+    prefix = inputs["registry-prefix"].replace("${{ github.repository_owner }}", owner)
+    assert release.IMAGE == f"{prefix}/{inputs['image-name']}"
+    assert jobs["github-release"]["needs"] == "manifest"
+
+
 @pytest.mark.parametrize("argv", [[], ["validate"], ["publish", "1.0.0"]])
 def test_usage(argv):
     assert release.main(argv) == 2

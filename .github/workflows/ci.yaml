@@ -87,6 +87,10 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
           tests/install_library.sh
+      # The contract tests skip when the library cannot be imported, for
+      # example after a bump adds a dependency. Fail here instead.
+      - name: Check the library imports
+        run: python3 -c "import monitor, ha_bridge, cloud_api"
       - name: pytest
         run: pytest
 
