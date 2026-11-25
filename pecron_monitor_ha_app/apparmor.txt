@@ -1,7 +1,7 @@
 #include <tunables/global>
 
 # Exactly one top-level profile: the Supervisor renames it to the installed slug.
-profile pecron_monitor_ha_app flags=(attach_disconnected,mediate_deleted,complain) {
+profile pecron_monitor_ha_app flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
 
   # MQTT, the Pecron cloud, the local device protocol and DNS. No raw sockets.
