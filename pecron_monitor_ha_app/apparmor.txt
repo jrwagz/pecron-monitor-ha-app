@@ -15,15 +15,8 @@ profile pecron_monitor_ha_app flags=(attach_disconnected,mediate_deleted,complai
   signal (send, receive) peer=@{profile_name},
   signal (receive) peer=unconfined,
 
-  # s6-overlay runs as root: it prepares /run, runs its catch-all logger as
-  # another user and signals it.
-  capability chown,
-  capability dac_override,
-  capability fowner,
-  capability fsetid,
-  capability kill,
-  capability setgid,
-  capability setuid,
+  # No capability rules: s6-overlay as configured here (root, no catch-all
+  # logger) and the app need none.
 
   # s6-overlay, execline and the shell
   / r,
