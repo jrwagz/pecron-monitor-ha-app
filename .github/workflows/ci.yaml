@@ -152,5 +152,10 @@ jobs:
           test "$actual" = "pecron-monitor ${expected}"
       - name: Check library imports in image
         run: docker run --rm --entrypoint python3 "$IMAGE" -c "import monitor, ha_bridge, cloud_api"
+      # The app containers run under the profile, in enforce mode as on HA.
+      - name: Load AppArmor profile
+        run: sudo apparmor_parser -r -W "$APP_DIR/apparmor.txt"
       - name: Smoke test
+        env:
+          SMOKE_APPARMOR: pecron_monitor_ha_app
         run: tests/smoke/run.sh "$IMAGE"
