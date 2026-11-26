@@ -104,8 +104,12 @@ create_app() {
   cp "$tmp/pecron-setup.yaml" "$tmp/$1/config/"
   # No --init: s6-overlay must be PID 1, as under the Supervisor.
   docker create --name "$1" --network "$id" ${security[@]+"${security[@]}"} "${@:3}" "$image" >/dev/null
-  docker cp "$tmp/$1/data" "$1:/"
-  docker cp "$tmp/$1/config" "$1:/"
+  # Root-owned, as under the Supervisor. "docker cp" keeps the host owner, and
+  # the AppArmor profile does not let root write another user's directory.
+  tar -C "$tmp/$1" -cf - data config |
+    docker run --rm -i --network none --entrypoint sh "$image" -c \
+      'mkdir /s && cd /s && tar -xf - && chown -R 0:0 data config && tar -cf - data config' |
+    docker cp - "$1:/"
 }
 
 # The live label of PID 1. "docker inspect" only repeats the requested option,
