@@ -2,7 +2,6 @@
 
 import copy
 import os
-import shutil
 from pathlib import Path
 
 import pytest
@@ -175,13 +174,11 @@ def test_wizard_secrets_and_rules_do_not_reach_library_config():
     assert c["devices"][0]["tsl_cache"] == F3000_TSL
 
 
-def test_library_uses_imported_tsl_as_controls(tmp_path, monkeypatch):
+def library_monitor(tmp_path, monkeypatch, setup_data):
     monitor = pytest.importorskip("monitor")
     for var in ("PECRON_STATE_PATH", "PECRON_ENERGY_STATE_PATH", "PECRON_RULE_STATE_PATH"):
         monkeypatch.setenv(var, str(tmp_path / var))
-    setup = tmp_path / "setup.yaml"
-    shutil.copy(WIZARD, setup)
-    tsl = load_tsl(str(setup))
+    tsl = load_tsl(write(tmp_path, setup_data))
     o = options("Local only", [device()])
     cfg.validate(o, tsl)
     m = monitor.PecronMonitor(
@@ -189,4 +186,44 @@ def test_library_uses_imported_tsl_as_controls(tmp_path, monkeypatch):
     )
     m.skip_local_setup = True
     m._build_devices_from_config()
+    return m
+
+
+def test_library_uses_imported_tsl_as_controls(tmp_path, monkeypatch):
+    m = library_monitor(tmp_path, monkeypatch, WIZARD_DATA)
     assert m.devices[0]["controls"] == F3000_TSL
+
+
+class RecordingTransport:
+    """Stands in for the library's LocalTransport; records writes, sends nothing."""
+
+    connected = False
+
+    def __init__(self):
+        self.writes = []
+
+    def connect(self):
+        self.connected = True
+        return True
+
+    def disconnect(self):
+        self.connected = False
+
+    def send_control(self, control_id, value, ctrl_type, verify=True):
+        self.writes.append((control_id, value, ctrl_type))
+        return True
+
+
+def test_switch_command_writes_the_imported_control_id(tmp_path, monkeypatch):
+    data = copy.deepcopy(WIZARD_DATA)
+    tsl = data["devices"][0]["tsl_cache"]
+    tsl["ac_switch_hm"]["id"] = 99  # the library default is 40
+    m = library_monitor(tmp_path, monkeypatch, data)
+    key = m.devices[0]["device_key"]
+    transport = m.local_transports[key] = RecordingTransport()
+
+    m._ha_command(key, "ac", "garbled")
+    assert transport.writes == []
+
+    m._ha_command(key, "ac", "ON")
+    assert transport.writes == [(99, True, "BOOL")]
