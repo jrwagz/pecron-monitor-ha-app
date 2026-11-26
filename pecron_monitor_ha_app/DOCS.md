@@ -314,7 +314,7 @@ correctly.
   Threshold` (the app has no number entities; each select appears only on models
   that have the control) are sent through the cloud. In Local only, or while
   Automatic has fallen back to local, they still appear but a change does not
-  stick: Home Assistant goes back to the old value. The only log message is
+  stick: Home Assistant keeps showing the old value. The only log message is
   `Cannot send control`, at debug level. If the cloud is lost while the app is
   already running, you may instead see `set_device_property_rest request failed`,
   possibly followed by a `Sent ... via CLOUD MQTT` line although nothing arrived.
@@ -339,21 +339,21 @@ correctly.
 
 ### Reporting cadence
 
-Measured with pecron-monitor v0.8.4 run from a computer (not yet with this app),
-local connection, poll interval 10, two F1000LFP and one F3000LFP:
+Measured with this app 0.1.0 on Home Assistant, with two F1000LFP and one
+F3000LFP:
 
-| Setup | Time between readings of a device (median) |
+| Mode and poll interval | Time between readings of a unit |
 |---|---|
-| Three devices in one process (how this app runs) | 25 s |
-| One device per process | 15 to 16 s |
+| Local only, 10 s | about 25 s |
+| Automatic, 70 s (after the startup warm-up) | about 75 to 85 s |
 
-A local read took about 5 s, the poll interval was added after it, and devices in
-one process were read one after another. Expect roughly the poll interval plus
-5 s per device. Intervals below 10 and other models were not measured.
+A local read takes about 5 s, the poll interval is added after it, and units are
+read one after another. Expect roughly the poll interval plus 5 s per unit in
+Local only. Intervals below 10 s and other models were not measured.
 
-Cloud reporting cadence was not measured. pecron-monitor's source notes that
-without high-frequency reporting, new data may arrive only about every 20
-minutes, however often it is requested.
+pecron-monitor's source notes that without high-frequency reporting, new data
+from the cloud may arrive only about every 20 minutes, however often it is
+requested.
 
 ### Cloud quota
 
@@ -443,8 +443,10 @@ The log shows `Login rejected (result=...)` for the local connection. Copy
   reservation) and Home Assistant can reach that network.
 - Cloud: look for `not found or not bound` (check the device key; that device
   gets no entities), `OFFLINE (device may not be connected to WiFi/internet)`
-  (check the unit in the Pecron app) or `No valid devices found`. A `code 4007`
-  warning ("device is not bound") can be ignored while data still arrives.
+  or `No valid devices found`. The `OFFLINE` warning can appear at startup for a
+  unit that is online: ignore it if values arrive, otherwise check the unit in
+  the Pecron app. A `code 4007` warning ("device is not bound") can also be
+  ignored while data still arrives.
 - `code 4026` or `Insufficient resources`: the [cloud quota](#cloud-quota) is
   used up. Raise the poll interval and restart; the limit resets at 00:00 UTC.
 - Devices that flap between values and unavailable: raise **Unavailable after**.
@@ -541,7 +543,19 @@ This is for users of
 **Device keys are upper-cased.** A 12-hex device key typed in lower case in the
 old app yields **new entity IDs** here: update dashboards and automations. The
 old lower-case device remains under MQTT; delete it once you no longer need to
-roll back. Whether other entity IDs carry over has not been measured yet.
+roll back.
+
+With an upper-case key, the entities that both apps provide **keep their entity
+IDs**. This was checked moving from the old app 0.0.30 with an F1000LFP, and a
+dashboard using those sensors needed no change. The device is now named
+`Pecron <model> (<device key>)`; rename it in Home Assistant if you like.
+
+Some entities of the old app are not provided by this app for the F1000LFP:
+the **UPS Mode** switch (UPS mode is now a read-only binary sensor), **Eco
+Mode**, **Touch Panel Lock**, **UPS Charge Threshold**, and expansion pack
+sensors while no pack is attached. Check automations and dashboards for them. If
+any remain as unavailable, stop the app, delete the unit's MQTT device and start
+the app again.
 
 ## Security and privacy
 
