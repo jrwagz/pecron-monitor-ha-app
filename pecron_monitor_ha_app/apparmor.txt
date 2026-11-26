@@ -46,7 +46,6 @@ profile pecron_monitor_ha_app flags=(attach_disconnected,mediate_deleted) {
   /usr/local/bin/ r,
   /usr/local/bin/** rmix,
   /usr/local/lib/{,**} rm,
-  /opt/pecron_app/{,**} r,
 
   # Options, generated config and state; the setup file
   /data/{,**} rwk,
